@@ -1,0 +1,96 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: 'Yu Gothic', 'Hiragino Kaku Gothic ProN', Arial, sans-serif;
+  --font-heading: 'Yu Mincho', 'Hiragino Mincho ProN', Georgia, serif;
+  --font-mono: 'Courier New', monospace;
+  --radius-sm: 0.3rem;
+  --radius-md: 0.45rem;
+  --radius-lg: 0.65rem;
+  --radius-xl: 0.9rem;
+}
+
+:root,
+.dark {
+  --background: #111211;
+  --foreground: #f1eee6;
+  --card: #1a1b1a;
+  --card-foreground: #f1eee6;
+  --popover: #20211f;
+  --popover-foreground: #f1eee6;
+  --primary: #d6b56e;
+  --primary-foreground: #17140e;
+  --secondary: #292a27;
+  --secondary-foreground: #ece8dd;
+  --muted: #242522;
+  --muted-foreground: #9e9d97;
+  --accent: #3a3224;
+  --accent-foreground: #f2d79c;
+  --destructive: #e56868;
+  --border: #30312e;
+  --input: #393a36;
+  --ring: #d6b56e;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    color-scheme: dark;
+    background: var(--background);
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    min-height: 100vh;
+    font-family: 'Yu Gothic', 'Hiragino Kaku Gothic ProN', Arial, sans-serif;
+  }
+
+  button,
+  input {
+    font: inherit;
+  }
+}
+
+.checkerboard {
+  background-color: #181917;
+  background-image:
+    linear-gradient(45deg, #20211f 25%, transparent 25%),
+    linear-gradient(-45deg, #20211f 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #20211f 75%),
+    linear-gradient(-45deg, transparent 75%, #20211f 75%);
+  background-position:
+    0 0,
+    0 12px,
+    12px -12px,
+    -12px 0;
+  background-size: 24px 24px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--primary) 35%, transparent);
+}
