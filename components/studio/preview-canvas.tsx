@@ -1,11 +1,21 @@
 'use client';
 
-import { useEffect, useRef, type KeyboardEvent, type PointerEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+} from 'react';
 import { Maximize2, Move, ScanLine } from 'lucide-react';
 
 import { positionFromPointer, type DragStart } from '@/src/editor/drag';
 import { renderTitleCard } from '@/src/editor/renderer';
-import type { BackgroundAsset, EditorState, PositionSettings } from '@/src/types';
+import type {
+  BackgroundAsset,
+  EditorState,
+  PositionSettings,
+} from '@/src/types';
 
 type PreviewCanvasProps = {
   state: EditorState;
@@ -20,6 +30,8 @@ export function PreviewCanvas({
 }: PreviewCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragRef = useRef<DragStart | null>(null);
+  const [zoom, setZoom] = useState<number | null>(null);
+  const [announcedPosition, setAnnouncedPosition] = useState(state.position);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -34,7 +46,46 @@ export function PreviewCanvas({
     });
   }, [background, state]);
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    let frame = 0;
+    const updateZoom = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        const bounds = canvas.getBoundingClientRect();
+        if (bounds.width <= 0 || bounds.height <= 0) return;
+        setZoom(
+          Math.round(
+            Math.min(
+              bounds.width / state.canvas.width,
+              bounds.height / state.canvas.height,
+            ) * 100,
+          ),
+        );
+      });
+    };
+    updateZoom();
+    const observer = new ResizeObserver(updateZoom);
+    observer.observe(canvas);
+    window.addEventListener('resize', updateZoom);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener('resize', updateZoom);
+    };
+  }, [state.canvas.height, state.canvas.width]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setAnnouncedPosition(state.position);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [state.position]);
+
   const beginDrag = (event: PointerEvent<HTMLCanvasElement>) => {
+    if (event.button !== 0) return;
+    event.currentTarget.focus();
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = {
       clientX: event.clientX,
@@ -78,12 +129,8 @@ export function PreviewCanvas({
     onPositionChange(next);
   };
 
-  const zoom = Math.round(
-    Math.min(100, (1100 / state.canvas.width) * 100),
-  );
-
   return (
-    <section className="preview-panel order-1 flex min-h-[390px] flex-col overflow-hidden rounded-xl border bg-[#171816] lg:order-2 lg:min-h-[calc(100vh-105px)]">
+    <section className="preview-panel flex min-h-[390px] flex-col overflow-hidden rounded-xl border bg-[#171816] lg:min-h-[calc(100vh-105px)]">
       <div className="flex min-h-13 items-center justify-between border-b px-4 py-2.5">
         <div>
           <div className="flex items-center gap-2">
@@ -91,7 +138,7 @@ export function PreviewCanvas({
             <h2 className="text-xs font-semibold tracking-wide">プレビュー</h2>
           </div>
           <p className="mt-1 text-[10px] text-muted-foreground">
-            {state.canvas.width} × {state.canvas.height} · 約{zoom}%
+            {state.canvas.width} × {state.canvas.height} · 約{zoom ?? '…'}%
           </p>
         </div>
         <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
@@ -100,7 +147,9 @@ export function PreviewCanvas({
           </span>
           <span className="flex items-center gap-1.5 rounded-md border bg-background/40 px-2 py-1">
             <Maximize2 className="size-3" />
-            {state.canvas.safeArea ? `SAFE ${state.canvas.safeArea}%` : 'GUIDE OFF'}
+            {state.canvas.safeArea
+              ? `SAFE ${state.canvas.safeArea}%`
+              : 'GUIDE OFF'}
           </span>
         </div>
       </div>
@@ -108,12 +157,15 @@ export function PreviewCanvas({
       <div className="checkerboard grid flex-1 place-items-center overflow-hidden p-3 sm:p-6 lg:p-8">
         <div
           className="relative w-full max-w-[1150px] overflow-hidden border border-white/10 bg-black/10 shadow-[0_28px_80px_rgba(0,0,0,.48)]"
-          style={{ aspectRatio: `${state.canvas.width} / ${state.canvas.height}` }}
+          style={{
+            aspectRatio: `${state.canvas.width} / ${state.canvas.height}`,
+          }}
         >
           <figure className="absolute inset-0 size-full">
             <canvas
               ref={canvasRef}
-              aria-describedby="preview-description"
+              aria-label={`${state.mainText || '無題'}のエリアタイトル配置`}
+              aria-describedby="preview-description preview-position-status"
               tabIndex={0}
               onPointerDown={beginDrag}
               onPointerMove={moveDrag}
@@ -123,17 +175,31 @@ export function PreviewCanvas({
               className="absolute inset-0 size-full cursor-move touch-none outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
             />
             <figcaption id="preview-description" className="sr-only">
-              {state.mainText || '無題'}{state.subText ? `、${state.subText}` : ''} のエリアタイトルプレビュー。矢印キーで位置を変更できます。
+              {state.mainText || '無題'}
+              {state.subText ? `、${state.subText}` : ''}{' '}
+              のエリアタイトルプレビュー。ドラッグまたは矢印キーで位置を変更できます。Shiftキーと矢印キーで5%ずつ移動します。
             </figcaption>
+            <output
+              id="preview-position-status"
+              className="sr-only"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              タイトル位置、横{announcedPosition.x.toFixed(1)}%、縦
+              {announcedPosition.y.toFixed(1)}%
+            </output>
           </figure>
         </div>
       </div>
 
       <div className="flex min-h-10 items-center justify-between border-t px-4 py-2 text-[10px] text-muted-foreground">
         <span>
-          位置 X {state.position.x.toFixed(1)}% · Y {state.position.y.toFixed(1)}%
+          位置 X {state.position.x.toFixed(1)}% · Y{' '}
+          {state.position.y.toFixed(1)}%
         </span>
-        <span>{background ? `背景: ${background.name}` : '透明背景で出力'}</span>
+        <span>
+          {background ? `背景: ${background.name}` : '透明背景で出力'}
+        </span>
       </div>
     </section>
   );

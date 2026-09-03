@@ -1,6 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import {
   Download,
   Dices,
@@ -12,31 +18,61 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EditorControls } from '@/components/studio/editor-controls';
 import { PresetPanel } from '@/components/studio/preset-panel';
 import { PreviewCanvas } from '@/components/studio/preview-canvas';
 import { PRESETS, applyPresetToState } from '@/src/data/presets';
 import { exportTitleCard, type ExportMode } from '@/src/editor/export';
+import { readSupportedImageDimensions } from '@/src/editor/image-dimensions.mjs';
 import { cloneDefaultState } from '@/src/state/defaults';
 import {
   clearEditorState,
   loadEditorState,
   saveEditorState,
 } from '@/src/state/storage';
-import type { AreaTitlePreset, BackgroundAsset, EditorState } from '@/src/types';
+import type {
+  AreaTitlePreset,
+  BackgroundAsset,
+  EditorState,
+} from '@/src/types';
+
+const DESKTOP_LAYOUT_QUERY = '(min-width: 1024px)';
+const MAX_BACKGROUND_EDGE = 8192;
+const MAX_BACKGROUND_PIXELS = 4096 * 4096;
+
+function subscribeToDesktopLayout(onChange: () => void) {
+  const query = window.matchMedia(DESKTOP_LAYOUT_QUERY);
+  query.addEventListener('change', onChange);
+  return () => query.removeEventListener('change', onChange);
+}
+
+function getDesktopLayoutSnapshot() {
+  return window.matchMedia(DESKTOP_LAYOUT_QUERY).matches;
+}
+
+function getServerDesktopLayoutSnapshot() {
+  return false;
+}
 
 export function AreaTitleStudio() {
+  const isDesktopLayout = useSyncExternalStore(
+    subscribeToDesktopLayout,
+    getDesktopLayoutSnapshot,
+    getServerDesktopLayoutSnapshot,
+  );
   const [state, setState] = useState<EditorState>(() => cloneDefaultState());
   const [hydrated, setHydrated] = useState(false);
   const [background, setBackground] = useState<BackgroundAsset | null>(null);
   const backgroundRef = useRef<BackgroundAsset | null>(null);
-  const [status, setStatus] = useState('すべての処理はこのブラウザ内で完結します');
+  const pendingBackgroundRef = useRef<{
+    image: HTMLImageElement;
+    url: string;
+  } | null>(null);
+  const backgroundRequestRef = useRef(0);
+  const [status, setStatus] = useState(
+    'タイトルと設定はこのブラウザに保存され、画像は外部へ送信されません',
+  );
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
@@ -53,11 +89,23 @@ export function AreaTitleStudio() {
     return () => window.clearTimeout(timer);
   }, [hydrated, state]);
 
+  const cancelPendingBackground = useCallback(() => {
+    backgroundRequestRef.current += 1;
+    const pending = pendingBackgroundRef.current;
+    if (!pending) return;
+    pendingBackgroundRef.current = null;
+    pending.image.onload = null;
+    pending.image.onerror = null;
+    pending.image.src = '';
+    URL.revokeObjectURL(pending.url);
+  }, []);
+
   useEffect(() => {
     return () => {
+      cancelPendingBackground();
       if (backgroundRef.current) URL.revokeObjectURL(backgroundRef.current.url);
     };
-  }, []);
+  }, [cancelPendingBackground]);
 
   const replaceBackground = (asset: BackgroundAsset | null) => {
     if (backgroundRef.current) URL.revokeObjectURL(backgroundRef.current.url);
@@ -65,7 +113,9 @@ export function AreaTitleStudio() {
     setBackground(asset);
   };
 
-  const loadBackground = (file: File) => {
+  const loadBackground = async (file: File) => {
+    cancelPendingBackground();
+    const requestId = backgroundRequestRef.current;
     if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
       setStatus('PNG・JPEG・WEBP形式の画像を選択してください');
       return;
@@ -75,13 +125,62 @@ export function AreaTitleStudio() {
       return;
     }
 
+    setStatus('背景画像を安全に確認しています…');
+    let dimensions;
+    try {
+      dimensions = readSupportedImageDimensions(
+        await file.arrayBuffer(),
+        file.type,
+      );
+    } catch {
+      if (requestId === backgroundRequestRef.current) {
+        setStatus('背景画像を読み込めませんでした');
+      }
+      return;
+    }
+    if (requestId !== backgroundRequestRef.current) return;
+    if (!dimensions) {
+      setStatus('画像データが選択された形式と一致しないか、破損しています');
+      return;
+    }
+    if (
+      dimensions.width > MAX_BACKGROUND_EDGE ||
+      dimensions.height > MAX_BACKGROUND_EDGE ||
+      dimensions.width * dimensions.height > MAX_BACKGROUND_PIXELS
+    ) {
+      setStatus('背景画像は最大8192px・約16.8メガピクセルまでです');
+      return;
+    }
+
     const url = URL.createObjectURL(file);
     const image = new Image();
+    pendingBackgroundRef.current = { image, url };
     image.onload = () => {
+      if (pendingBackgroundRef.current?.image !== image) return;
+      pendingBackgroundRef.current = null;
+      image.onload = null;
+      image.onerror = null;
+      const { naturalWidth, naturalHeight } = image;
+      if (
+        naturalWidth <= 0 ||
+        naturalHeight <= 0 ||
+        naturalWidth > MAX_BACKGROUND_EDGE ||
+        naturalHeight > MAX_BACKGROUND_EDGE ||
+        naturalWidth * naturalHeight > MAX_BACKGROUND_PIXELS
+      ) {
+        URL.revokeObjectURL(url);
+        image.src = '';
+        setStatus('背景画像は最大8192px・約16.8メガピクセルまでです');
+        return;
+      }
       replaceBackground({ image, url, name: file.name });
       setStatus(`背景「${file.name}」を読み込みました（端末内のみ）`);
     };
     image.onerror = () => {
+      if (pendingBackgroundRef.current?.image !== image) return;
+      pendingBackgroundRef.current = null;
+      image.onload = null;
+      image.onerror = null;
       URL.revokeObjectURL(url);
       setStatus('背景画像を読み込めませんでした');
     };
@@ -95,11 +194,13 @@ export function AreaTitleStudio() {
 
   const randomize = () => {
     const candidates = PRESETS.filter((preset) => preset.id !== state.presetId);
-    const preset = candidates[Math.floor(Math.random() * candidates.length)] ?? PRESETS[0];
+    const preset =
+      candidates[Math.floor(Math.random() * candidates.length)] ?? PRESETS[0];
     applyPreset(preset);
   };
 
   const reset = () => {
+    cancelPendingBackground();
     clearEditorState();
     replaceBackground(null);
     setState(cloneDefaultState());
@@ -117,11 +218,87 @@ export function AreaTitleStudio() {
       const result = await exportTitleCard(state, mode, background?.image);
       setStatus(`PNGを保存しました（${result.width} × ${result.height}px）`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'PNGの保存に失敗しました');
+      setStatus(
+        error instanceof Error ? error.message : 'PNGの保存に失敗しました',
+      );
     } finally {
       setExporting(false);
     }
   };
+
+  const editorPanel = (
+    <aside
+      key="editor"
+      className="flex min-h-[680px] flex-col overflow-hidden rounded-xl border bg-card/95 lg:h-[calc(100dvh-105px)] lg:min-h-0"
+    >
+      <Tabs
+        defaultValue="edit"
+        className="min-h-0 flex-1 flex-col gap-0 overflow-hidden"
+      >
+        <div className="border-b p-2.5">
+          <TabsList className="grid h-9 w-full grid-cols-2 bg-background/55">
+            <TabsTrigger value="edit">
+              <Settings2 /> 編集
+            </TabsTrigger>
+            <TabsTrigger value="presets">
+              <SwatchBook /> プリセット
+            </TabsTrigger>
+          </TabsList>
+        </div>
+        <TabsContent
+          value="edit"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        >
+          <EditorControls
+            state={state}
+            setState={setState}
+            background={background}
+            onBackgroundFile={loadBackground}
+            onRemoveBackground={() => {
+              cancelPendingBackground();
+              replaceBackground(null);
+              setStatus('背景画像を削除しました');
+            }}
+            onExport={exportImage}
+            exporting={exporting}
+          />
+        </TabsContent>
+        <TabsContent
+          value="presets"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        >
+          <PresetPanel selectedId={state.presetId} onApply={applyPreset} />
+        </TabsContent>
+      </Tabs>
+      <output
+        aria-live="polite"
+        aria-atomic="true"
+        className="flex min-h-10 items-center border-t bg-background/30 px-4 py-2 text-[10px] text-muted-foreground"
+      >
+        <span className="mr-2 size-1.5 shrink-0 rounded-full bg-primary" />
+        <span className="min-w-0 flex-1 truncate">{status}</span>
+        <a
+          href="THIRD_PARTY_LICENSES.txt"
+          target="_blank"
+          rel="noreferrer"
+          className="ml-3 shrink-0 underline-offset-2 hover:text-foreground hover:underline"
+        >
+          第三者ライセンス
+        </a>
+      </output>
+    </aside>
+  );
+
+  const previewPanel = (
+    <PreviewCanvas
+      key="preview"
+      state={state}
+      background={background}
+      onPositionChange={(position) =>
+        setState((current) => ({ ...current, position }))
+      }
+    />
+  );
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_72%_4%,rgba(214,181,110,.075),transparent_30%)]">
@@ -142,9 +319,16 @@ export function AreaTitleStudio() {
 
         <div className="flex items-center gap-1.5 sm:gap-2">
           <span className="mr-2 hidden items-center gap-1.5 text-[9px] text-muted-foreground xl:flex">
-            <LockKeyhole className="size-3 text-primary" /> 画像は外部へ送信されません
+            <LockKeyhole className="size-3 text-primary" />{' '}
+            画像は外部へ送信されません
           </span>
-          <Button type="button" variant="ghost" size="sm" aria-label="ランダムなデザインを適用" onClick={randomize}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label="ランダムなデザインを適用"
+            onClick={randomize}
+          >
             <Dices /> <span className="hidden sm:inline">ランダム</span>
           </Button>
           <Button
@@ -153,65 +337,34 @@ export function AreaTitleStudio() {
             size="sm"
             aria-label="初期状態に戻す"
             onClick={() => {
-              if (window.confirm('入力内容と保存済み設定を消去し、初期状態に戻しますか？')) {
+              if (
+                window.confirm(
+                  '入力内容と編集設定を消去し、初期状態に戻しますか？（お気に入りは保持されます）',
+                )
+              ) {
                 reset();
               }
             }}
           >
             <RotateCcw /> <span className="hidden sm:inline">リセット</span>
           </Button>
-          <Button type="button" size="sm" aria-label="透過PNGとして保存" disabled={exporting} onClick={() => exportImage('transparent')}>
-            <Download /> <span className="hidden min-[420px]:inline">PNG保存</span>
+          <Button
+            type="button"
+            size="sm"
+            aria-label="透過PNGとして保存"
+            disabled={exporting}
+            onClick={() => exportImage('transparent')}
+          >
+            <Download />{' '}
+            <span className="hidden min-[420px]:inline">PNG保存</span>
           </Button>
         </div>
       </header>
 
       <div className="mx-auto grid max-w-[1900px] gap-3 p-3 lg:grid-cols-[430px_minmax(0,1fr)] lg:gap-4 lg:p-5">
-        <aside className="order-2 flex min-h-[680px] flex-col overflow-hidden rounded-xl border bg-card/95 lg:order-1 lg:h-[calc(100vh-105px)] lg:min-h-0">
-          <Tabs defaultValue="edit" className="min-h-0 flex-1 gap-0">
-            <div className="border-b p-2.5">
-              <TabsList className="grid h-9 w-full grid-cols-2 bg-background/55">
-                <TabsTrigger value="edit">
-                  <Settings2 /> 編集
-                </TabsTrigger>
-                <TabsTrigger value="presets">
-                  <SwatchBook /> プリセット
-                </TabsTrigger>
-              </TabsList>
-            </div>
-            <TabsContent value="edit" className="min-h-0 overflow-hidden">
-              <EditorControls
-                state={state}
-                setState={setState}
-                background={background}
-                onBackgroundFile={loadBackground}
-                onRemoveBackground={() => {
-                  replaceBackground(null);
-                  setStatus('背景画像を削除しました');
-                }}
-                onExport={exportImage}
-                exporting={exporting}
-              />
-            </TabsContent>
-            <TabsContent value="presets" className="min-h-0 overflow-hidden">
-              <PresetPanel selectedId={state.presetId} onApply={applyPreset} />
-            </TabsContent>
-          </Tabs>
-          <output
-            aria-live="polite"
-            aria-atomic="true"
-            className="flex min-h-10 items-center border-t bg-background/30 px-4 py-2 text-[10px] text-muted-foreground"
-          >
-            <span className="mr-2 size-1.5 shrink-0 rounded-full bg-primary" />
-            <span className="truncate">{status}</span>
-          </output>
-        </aside>
-
-        <PreviewCanvas
-          state={state}
-          background={background}
-          onPositionChange={(position) => setState((current) => ({ ...current, position }))}
-        />
+        {isDesktopLayout
+          ? [editorPanel, previewPanel]
+          : [previewPanel, editorPanel]}
       </div>
     </main>
   );

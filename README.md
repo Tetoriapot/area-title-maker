@@ -4,14 +4,35 @@
 
 ## 起動
 
-Node.js 22.13以降を使用してください。
+`.node-version`で固定したNode.js 22.23.2と、`package.json`で固定したpnpm 11.25.0を使用してください。依存パッケージへpnpm固有のセキュリティパッチを適用するため、`npm install`は使用しません。
 
 ```bash
-npm install
-npm run dev
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
-本番ビルドは `npm run build` です。pnpmを利用する場合も同じスクリプト名で起動できます。
+本番ビルドは`pnpm build`です。pnpmが未導入の場合は、先に`npm install --global pnpm@11.25.0`などで同じバージョンを用意してください。
+
+## GitHub Pagesで公開
+
+このプロジェクトには、`main`ブランチへのpush時に静的サイトをビルドしてGitHub Pagesへ公開するワークフローが含まれています。
+
+1. GitHubでリポジトリを作成し、ソースをpushします。
+2. リポジトリの「Settings」→「Pages」を開き、「Build and deployment」の「Source」に「GitHub Actions」を選びます。
+3. 初回pushのワークフローが先に失敗していた場合は、「Actions」から「Deploy to GitHub Pages」を再実行します。
+4. ワークフローが完了すると、公開URLが表示されます。
+
+ユーザー／組織サイト（`<account>.github.io`）とプロジェクトサイト（`<account>.github.io/<repository>`）のどちらでも、公開先のパスを自動で反映します。
+
+`main`へのpushは公開サイトへ自動反映されます。公開前に変更内容を確認し、必要に応じてブランチ保護や`github-pages`環境の承認ルールを設定してください。タイトル、サブタイトル、編集設定、お気に入りはブラウザの`localStorage`へ保存され、背景画像は保存・送信されません。
+
+## 利用条件
+
+このリポジトリにはオープンソースライセンスを付与していません。GitHubおよびGitHub Pagesでの公開は、ソースコードやリポジトリ固有画像の複製・改変・再配布・商用利用を許諾するものではありません。画像の来歴は`ASSET_PROVENANCE.md`に記録しています。
+
+依存パッケージには、それぞれの権利者が定めたライセンスが適用されます。依存パッケージのライセンス表示は、ビルド前に`public/THIRD_PARTY_LICENSES.txt`へ自動生成されます。
+
+依存関係の既知問題とローカル修正は`SECURITY.md`に記録しています。`image-size@2.0.2`には未修正版しかない脆弱性があるため、上流修正を`patches/`へ固定しています。依存更新時もこのパッチが適用されることを確認してください。
 
 ## 実装済み
 

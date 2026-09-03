@@ -1,8 +1,11 @@
 import type { EditorState } from '@/src/types';
 
+export const SAMPLE_MAIN_TEXT = '忘れられた王都';
+export const SAMPLE_SUB_TEXT = 'Forgotten Capital';
+
 export const DEFAULT_STATE: EditorState = {
-  mainText: '忘れられた王都',
-  subText: 'Forgotten Capital',
+  mainText: SAMPLE_MAIN_TEXT,
+  subText: SAMPLE_SUB_TEXT,
   presetId: 'golden-kingdom',
   mainTextStyle: {
     fontFamily: '"Yu Mincho", "Hiragino Mincho ProN", serif',

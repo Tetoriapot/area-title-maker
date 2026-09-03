@@ -2,20 +2,27 @@
   "name": "area-title-maker",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.25.0",
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.23.2 <23"
   },
   "scripts": {
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "wrangler dev --config dist/server/wrangler.json",
-    "lint": "oxlint",
-    "format": "oxfmt"
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint app components/area-title-studio.tsx components/studio components/ui/accordion.tsx components/ui/button.tsx components/ui/input.tsx components/ui/native-select.tsx components/ui/slider.tsx components/ui/switch.tsx components/ui/tabs.tsx components/ui/textarea.tsx scripts src tests next.config.ts vite.config.ts",
+    "audit:prod": "pnpm audit --prod --ignore GHSA-w3rx-r6r6-pgpr --ignore GHSA-5p2g-fcmc-qvqq",
+    "licenses:generate": "node scripts/generate-third-party-licenses.mjs",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check .",
+    "test": "node --test tests/image-dimensions.test.mjs",
+    "test:pages": "node --test tests/rendered-html.test.mjs"
   },
   "dependencies": {
-    "react": "19.2.6",
-    "react-dom": "19.2.6",
-    "react-server-dom-webpack": "19.2.6",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-server-dom-webpack": "19.2.8",
     "vinext": "1.0.0-beta.5",
     "@base-ui/react": "1.7.0",
     "@shadcn/react": "0.3.0",
@@ -42,13 +49,13 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
-    "@vitejs/plugin-rsc": "0.5.26",
+    "@vitejs/plugin-rsc": "0.5.29",
     "oxfmt": "0.61.0",
     "oxlint": "1.76.0",
     "oxlint-tsgolint": "7.0.2001",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
-    "vite": "8.0.13",
+    "vite": "8.2.2",
     "wrangler": "4.92.0"
   },
   "type": "module"

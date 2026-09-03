@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Palette, Search, Star } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -9,10 +9,25 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from '@/components/ui/native-select';
-import { PRESETS } from '@/src/data/presets';
+import { PRESETS, applyPresetToState } from '@/src/data/presets';
+import { renderTitleCard } from '@/src/editor/renderer';
+import { cloneDefaultState } from '@/src/state/defaults';
 import { PRESET_CATEGORIES, type AreaTitlePreset } from '@/src/types';
 
 const FAVORITES_KEY = 'area-title-maker:favorites:v1';
+const MAX_FAVORITES_LENGTH = 16 * 1024;
+const PRESET_IDS = new Set(PRESETS.map((preset) => preset.id));
+
+function normalizeFavorites(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return [
+    ...new Set(
+      value.filter(
+        (id): id is string => typeof id === 'string' && PRESET_IDS.has(id),
+      ),
+    ),
+  ].slice(0, PRESETS.length);
+}
 
 type PresetPanelProps = {
   selectedId: string;
@@ -23,9 +38,74 @@ function needsLightBackdrop(color: string) {
   if (!/^#[0-9a-f]{6}$/i.test(color)) return false;
   const value = Number.parseInt(color.slice(1), 16);
   const luminance =
-    (((value >> 16) & 255) * 299 + ((value >> 8) & 255) * 587 + (value & 255) * 114) /
+    (((value >> 16) & 255) * 299 +
+      ((value >> 8) & 255) * 587 +
+      (value & 255) * 114) /
     1000;
   return luminance < 90;
+}
+
+function PresetThumbnail({
+  preset,
+  lightBackdrop,
+}: {
+  preset: AreaTitlePreset;
+  lightBackdrop: boolean;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [shouldRender, setShouldRender] = useState(false);
+  const thumbnailState = useMemo(() => {
+    const next = applyPresetToState(cloneDefaultState(), preset);
+    return {
+      ...next,
+      canvas: { ...next.canvas, safeArea: 0 as const },
+      position: { x: 0, y: 0 },
+    };
+  }, [preset]);
+
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      const timer = window.setTimeout(() => setShouldRender(true), 0);
+      return () => window.clearTimeout(timer);
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        setShouldRender(true);
+        observer.disconnect();
+      },
+      { rootMargin: '160px' },
+    );
+    observer.observe(frame);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!shouldRender) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    renderTitleCard(canvas, thumbnailState, {
+      bitmapScale: 0.18,
+      drawGuide: false,
+    });
+  }, [shouldRender, thumbnailState]);
+
+  return (
+    <div
+      ref={frameRef}
+      className="aspect-video overflow-hidden"
+      style={{
+        background: lightBackdrop
+          ? 'linear-gradient(145deg, #f2efe8, #d8d3c9)'
+          : 'radial-gradient(circle at 50% 15%, #272824, #111210 72%)',
+      }}
+    >
+      <canvas ref={canvasRef} aria-hidden="true" className="block size-full" />
+    </div>
+  );
 }
 
 export function PresetPanel({ selectedId, onApply }: PresetPanelProps) {
@@ -38,7 +118,14 @@ export function PresetPanel({ selectedId, onApply }: PresetPanelProps) {
     const timer = window.setTimeout(() => {
       try {
         const stored = window.localStorage.getItem(FAVORITES_KEY);
-        if (stored) setFavorites(JSON.parse(stored) as string[]);
+        if (!stored) return;
+        if (stored.length > MAX_FAVORITES_LENGTH) {
+          window.localStorage.removeItem(FAVORITES_KEY);
+          return;
+        }
+        const next = normalizeFavorites(JSON.parse(stored) as unknown);
+        setFavorites(next);
+        window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(next));
       } catch {
         // Favorites are optional when browser storage is blocked.
       }
@@ -49,17 +136,23 @@ export function PresetPanel({ selectedId, onApply }: PresetPanelProps) {
   const filtered = useMemo(() => {
     const term = query.trim().toLocaleLowerCase();
     return PRESETS.filter((preset) => {
-      const matchesCategory = category === 'All' || preset.category === category;
+      const matchesCategory =
+        category === 'All' || preset.category === category;
       const matchesFavorite = !favoritesOnly || favorites.includes(preset.id);
-      const haystack = `${preset.name} ${preset.category} ${preset.mainText} ${preset.subText}`.toLocaleLowerCase();
-      return matchesCategory && matchesFavorite && (!term || haystack.includes(term));
+      const haystack =
+        `${preset.name} ${preset.category} ${preset.mainText} ${preset.subText}`.toLocaleLowerCase();
+      return (
+        matchesCategory && matchesFavorite && (!term || haystack.includes(term))
+      );
     });
   }, [category, favorites, favoritesOnly, query]);
 
   const toggleFavorite = (id: string) => {
-    const next = favorites.includes(id)
-      ? favorites.filter((favorite) => favorite !== id)
-      : [...favorites, id];
+    const next = normalizeFavorites(
+      favorites.includes(id)
+        ? favorites.filter((favorite) => favorite !== id)
+        : [...favorites, id],
+    );
     setFavorites(next);
     try {
       window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(next));
@@ -69,15 +162,22 @@ export function PresetPanel({ selectedId, onApply }: PresetPanelProps) {
   };
 
   return (
-    <section aria-labelledby="preset-heading" className="flex min-h-0 flex-1 flex-col">
+    <section
+      aria-labelledby="preset-heading"
+      className="flex h-full min-h-0 flex-1 flex-col"
+    >
       <div className="space-y-3 border-b p-4">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
               <Palette className="size-3.5 text-primary" />
-              <h2 id="preset-heading" className="text-sm font-semibold">プリセット</h2>
+              <h2 id="preset-heading" className="text-sm font-semibold">
+                プリセット
+              </h2>
             </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">50種から雰囲気を選択</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              50種から雰囲気を選択
+            </p>
           </div>
           <span className="rounded-md border bg-background/40 px-2 py-1 font-mono text-[10px] text-muted-foreground">
             {filtered.length} / 50
@@ -100,9 +200,13 @@ export function PresetPanel({ selectedId, onApply }: PresetPanelProps) {
             aria-label="カテゴリで絞り込む"
             className="w-full"
           >
-            <NativeSelectOption value="All">すべてのカテゴリ</NativeSelectOption>
+            <NativeSelectOption value="All">
+              すべてのカテゴリ
+            </NativeSelectOption>
             {PRESET_CATEGORIES.map((item) => (
-              <NativeSelectOption key={item} value={item}>{item}</NativeSelectOption>
+              <NativeSelectOption key={item} value={item}>
+                {item}
+              </NativeSelectOption>
             ))}
           </NativeSelect>
           <Button
@@ -113,18 +217,25 @@ export function PresetPanel({ selectedId, onApply }: PresetPanelProps) {
             aria-pressed={favoritesOnly}
             onClick={() => setFavoritesOnly((value) => !value)}
           >
-            <Star className={favoritesOnly ? 'fill-primary text-primary' : ''} />
+            <Star
+              className={favoritesOnly ? 'fill-primary text-primary' : ''}
+            />
           </Button>
         </div>
       </div>
 
-      <div className="min-h-[360px] flex-1 overflow-y-auto p-3">
+      <section
+        aria-label="プリセット一覧"
+        className="min-h-0 flex-1 overflow-visible overscroll-auto p-3 scrollbar-gutter-stable scrollbar-thin lg:touch-pan-y lg:overflow-y-auto lg:overscroll-contain"
+      >
         {filtered.length > 0 ? (
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {filtered.map((preset) => {
               const favorite = favorites.includes(preset.id);
               const selected = selectedId === preset.id;
-              const lightBackdrop = needsLightBackdrop(preset.mainTextStyle.color);
+              const lightBackdrop =
+                needsLightBackdrop(preset.mainTextStyle.color) ||
+                needsLightBackdrop(preset.subTextStyle.color);
               return (
                 <div
                   key={preset.id}
@@ -141,47 +252,14 @@ export function PresetPanel({ selectedId, onApply }: PresetPanelProps) {
                     onClick={() => onApply(preset)}
                     className="block w-full text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
                   >
-                    <div
-                      className="flex aspect-[1.5] flex-col items-center justify-center overflow-hidden px-1"
-                      style={{
-                        background: lightBackdrop
-                          ? 'linear-gradient(145deg, #f2efe8, #d8d3c9)'
-                          : 'radial-gradient(circle at 50% 15%, #272824, #111210 72%)',
-                      }}
-                    >
-                      <span
-                        className="max-w-full truncate text-[10px] leading-none"
-                        style={{
-                          color: preset.mainTextStyle.color,
-                          fontFamily: preset.mainTextStyle.fontFamily,
-                          fontWeight: preset.mainTextStyle.weight,
-                          letterSpacing: `${Math.min(2.5, preset.mainTextStyle.letterSpacing / 6)}px`,
-                        }}
-                      >
-                        {preset.mainText}
+                    <PresetThumbnail
+                      preset={preset}
+                      lightBackdrop={lightBackdrop}
+                    />
+                    <div className="border-t px-2 py-2 pr-9">
+                      <span className="block truncate text-[9px] font-medium">
+                        {preset.name}
                       </span>
-                      {preset.decoration.lineStyle !== 'none' && (
-                        <span className="my-1 flex w-[76%] items-center gap-1" style={{ color: preset.decoration.color }}>
-                          <span className="h-px flex-1 bg-current opacity-70" />
-                          <span className="text-[8px]">{preset.decoration.symbol}</span>
-                          <span className="h-px flex-1 bg-current opacity-70" />
-                        </span>
-                      )}
-                      {preset.subText && (
-                        <span
-                          className="max-w-full truncate text-[6px] leading-none opacity-80"
-                          style={{
-                            color: preset.subTextStyle.color,
-                            fontFamily: preset.subTextStyle.fontFamily,
-                            letterSpacing: '.4px',
-                          }}
-                        >
-                          {preset.subText}
-                        </span>
-                      )}
-                    </div>
-                    <div className="border-t px-2 py-2">
-                      <span className="block truncate text-[9px] font-medium">{preset.name}</span>
                       <span className="mt-0.5 block truncate text-[8px] text-muted-foreground">
                         {preset.category}
                       </span>
@@ -192,9 +270,15 @@ export function PresetPanel({ selectedId, onApply }: PresetPanelProps) {
                     aria-label={`${preset.name}を${favorite ? 'お気に入りから外す' : 'お気に入りに追加'}`}
                     aria-pressed={favorite}
                     onClick={() => toggleFavorite(preset.id)}
-                    className="absolute right-1 top-1 grid size-6 place-items-center rounded-md bg-black/45 text-white/70 opacity-100 outline-none transition hover:text-primary focus-visible:ring-2 focus-visible:ring-primary lg:opacity-0 lg:group-hover:opacity-100 lg:focus:opacity-100"
+                    className={`absolute bottom-1 right-1 grid size-6 place-items-center rounded-md bg-background/80 text-muted-foreground opacity-100 outline-none transition hover:text-primary focus-visible:ring-2 focus-visible:ring-primary lg:focus:opacity-100 ${
+                      favorite
+                        ? 'lg:opacity-100'
+                        : 'lg:opacity-0 lg:group-hover:opacity-100'
+                    }`}
                   >
-                    <Star className={`size-3 ${favorite ? 'fill-primary text-primary' : ''}`} />
+                    <Star
+                      className={`size-3 ${favorite ? 'fill-primary text-primary' : ''}`}
+                    />
                   </button>
                 </div>
               );
@@ -219,7 +303,7 @@ export function PresetPanel({ selectedId, onApply }: PresetPanelProps) {
             </div>
           </div>
         )}
-      </div>
+      </section>
     </section>
   );
 }

@@ -3,7 +3,11 @@ import type { EditorState } from '@/src/types';
 
 export type ExportMode = 'transparent' | 'trimmed' | 'background';
 
-function getAlphaBounds(context: CanvasRenderingContext2D, width: number, height: number) {
+function getAlphaBounds(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+) {
   const pixels = context.getImageData(0, 0, width, height).data;
   let minX = width;
   let minY = height;
@@ -68,24 +72,31 @@ export async function exportTitleCard(
       output = document.createElement('canvas');
       output.width = Math.max(1, cropRight - cropX);
       output.height = Math.max(1, cropBottom - cropY);
-      output.getContext('2d')?.drawImage(
-        source,
-        cropX,
-        cropY,
-        output.width,
-        output.height,
-        0,
-        0,
-        output.width,
-        output.height,
-      );
+      output
+        .getContext('2d')
+        ?.drawImage(
+          source,
+          cropX,
+          cropY,
+          output.width,
+          output.height,
+          0,
+          0,
+          output.width,
+          output.height,
+        );
     }
   }
 
   const blob = await canvasBlob(output);
   const objectUrl = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
-  const suffix = mode === 'background' ? 'background' : mode === 'trimmed' ? 'trimmed' : 'transparent';
+  const suffix =
+    mode === 'background'
+      ? 'background'
+      : mode === 'trimmed'
+        ? 'trimmed'
+        : 'transparent';
   anchor.download = `${safeFileName(state.mainText)}-${suffix}.png`;
   anchor.href = objectUrl;
   document.body.appendChild(anchor);
