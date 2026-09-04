@@ -22,6 +22,10 @@ test('GitHub Pages output uses the configured project URL', () => {
     'favicon.svg is missing',
   );
   assert.ok(existsSync(resolve(outputRoot, 'og.png')), 'og.png is missing');
+  assert.ok(
+    existsSync(resolve(outputRoot, 'FONT_NOTICES.txt')),
+    'FONT_NOTICES.txt is missing',
+  );
 
   const siteUrl = new URL(
     configuredUrl.endsWith('/') ? configuredUrl : `${configuredUrl}/`,
@@ -31,8 +35,13 @@ test('GitHub Pages output uses the configured project URL', () => {
   assert.doesNotMatch(html, /http:\/\/localhost(?::\d+)?/i);
   assert.doesNotMatch(
     html,
-    /(?:src|href)=["']\/(?:_next\/|favicon\.svg|og\.png)/i,
+    /(?:src|href)=["']\/(?:_next\/|favicon\.svg|og\.png|FONT_NOTICES\.txt)/i,
     'A root-relative asset URL would break on a project Pages site',
+  );
+  assert.doesNotMatch(
+    html,
+    /fonts\.(?:googleapis|gstatic)\.com/i,
+    'The default HTML must not preload Google Fonts',
   );
   assert.match(html, new RegExp(escapeRegExp(siteUrl.href)));
 

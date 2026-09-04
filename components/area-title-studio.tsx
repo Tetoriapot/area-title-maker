@@ -71,7 +71,7 @@ export function AreaTitleStudio() {
   } | null>(null);
   const backgroundRequestRef = useRef(0);
   const [status, setStatus] = useState(
-    'タイトルと設定はこのブラウザに保存され、画像は外部へ送信されません',
+    'タイトル本文と画像はアップロードしません。Google Fontsは選択時のみ取得します',
   );
   const [exporting, setExporting] = useState(false);
 
@@ -213,7 +213,7 @@ export function AreaTitleStudio() {
       return;
     }
     setExporting(true);
-    setStatus('PNGを書き出しています…');
+    setStatus('フォントを確認してPNGを書き出しています…');
     try {
       const result = await exportTitleCard(state, mode, background?.image);
       setStatus(`PNGを保存しました（${result.width} × ${result.height}px）`);
@@ -284,6 +284,14 @@ export function AreaTitleStudio() {
           className="ml-3 shrink-0 underline-offset-2 hover:text-foreground hover:underline"
         >
           第三者ライセンス
+        </a>
+        <a
+          href="FONT_NOTICES.txt"
+          target="_blank"
+          rel="noreferrer"
+          className="ml-3 shrink-0 underline-offset-2 hover:text-foreground hover:underline"
+        >
+          書体について
         </a>
       </output>
     </aside>

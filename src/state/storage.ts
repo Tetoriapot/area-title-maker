@@ -1,4 +1,9 @@
-import { FONT_OPTIONS } from '@/src/data/fonts';
+import {
+  EDITOR_FONT_WEIGHTS,
+  VALID_FONT_FAMILIES,
+  findFontOption,
+  nearestSupportedFontWeight,
+} from '@/src/data/fonts';
 import { SYMBOLS } from '@/src/data/symbols';
 import { cloneDefaultState } from '@/src/state/defaults';
 import type { EditorState, TextStyle } from '@/src/types';
@@ -20,8 +25,7 @@ const LINE_STYLES = [
   'sides',
   'fade',
 ] as const;
-const FONT_FAMILIES: readonly string[] = FONT_OPTIONS.map((font) => font.value);
-const FONT_WEIGHTS = [300, 400, 500, 600, 700, 800, 900] as const;
+const FONT_FAMILIES: readonly string[] = VALID_FONT_FAMILIES;
 const SAFE_AREAS = [0, 50, 70] as const;
 const TRIM_PADDINGS = [32, 64, 128] as const;
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
@@ -65,8 +69,19 @@ function colorValue(value: unknown, fallback: string) {
 
 function normalizeTextStyle(value: unknown, fallback: TextStyle): TextStyle {
   const source = isRecord(value) ? value : {};
+  const fontFamily = oneOf(
+    source.fontFamily,
+    FONT_FAMILIES,
+    fallback.fontFamily,
+  );
+  const font = findFontOption(fontFamily);
+  const requestedWeight = oneOf(
+    source.weight,
+    EDITOR_FONT_WEIGHTS,
+    fallback.weight,
+  );
   return {
-    fontFamily: oneOf(source.fontFamily, FONT_FAMILIES, fallback.fontFamily),
+    fontFamily,
     size: clampNumber(source.size, fallback.size, 12, 180),
     color: colorValue(source.color, fallback.color),
     letterSpacing: clampNumber(
@@ -75,8 +90,8 @@ function normalizeTextStyle(value: unknown, fallback: TextStyle): TextStyle {
       -2,
       40,
     ),
-    weight: oneOf(source.weight, FONT_WEIGHTS, fallback.weight),
-    italic: booleanValue(source.italic, fallback.italic),
+    weight: nearestSupportedFontWeight(font, requestedWeight),
+    italic: font?.italic ? booleanValue(source.italic, fallback.italic) : false,
     opacity: clampNumber(source.opacity, fallback.opacity, 0, 1),
   };
 }

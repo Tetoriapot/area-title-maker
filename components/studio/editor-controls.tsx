@@ -27,12 +27,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   NativeSelect,
+  NativeSelectOptGroup,
   NativeSelectOption,
 } from '@/components/ui/native-select';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { FONT_OPTIONS } from '@/src/data/fonts';
+import {
+  EDITOR_FONT_WEIGHTS,
+  FONT_OPTIONS,
+  findFontOption,
+  nearestSupportedFontWeight,
+  type FontCategory,
+} from '@/src/data/fonts';
 import { SYMBOLS } from '@/src/data/symbols';
 import type {
   BackgroundAsset,
@@ -73,6 +80,14 @@ const layoutLabels: Record<LayoutType, string> = {
   F: 'タイトル・サブ',
   G: '上下線で囲む',
 };
+
+const fontGroups: Array<{ category: FontCategory; label: string }> = [
+  { category: 'google-japanese', label: 'Google Fonts · 日本語' },
+  { category: 'google-latin', label: 'Google Fonts · 英字向け' },
+  { category: 'system', label: '端末内フォント' },
+];
+
+const JAPANESE_TEXT = /[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/;
 
 type EditorControlsProps = {
   state: EditorState;
@@ -193,14 +208,29 @@ function ToggleRow({
 
 function TextStyleControls({
   title,
+  text,
   style,
   onChange,
 }: {
   title: string;
+  text: string;
   style: TextStyle;
   onChange: (style: TextStyle) => void;
 }) {
   const patch = (next: Partial<TextStyle>) => onChange({ ...style, ...next });
+  const selectedFont = findFontOption(style.fontFamily);
+  const weights = selectedFont?.weights ?? EDITOR_FONT_WEIGHTS;
+  const italicAvailable = selectedFont?.italic ?? true;
+
+  const changeFont = (fontFamily: string) => {
+    const font = findFontOption(fontFamily);
+    patch({
+      fontFamily,
+      weight: nearestSupportedFontWeight(font, style.weight),
+      italic: Boolean(font?.italic && style.italic),
+    });
+  };
+
   return (
     <div className="space-y-3 rounded-lg border bg-background/20 p-3">
       <div className="flex items-center justify-between">
@@ -214,16 +244,29 @@ function TextStyleControls({
         <span className="text-[11px] text-muted-foreground">フォント</span>
         <NativeSelect
           value={style.fontFamily}
-          onChange={(event) => patch({ fontFamily: event.target.value })}
+          onChange={(event) => changeFont(event.target.value)}
           aria-label={`${title}のフォント`}
           className="w-full"
         >
-          {FONT_OPTIONS.map((font) => (
-            <NativeSelectOption key={font.label} value={font.value}>
-              {font.label}
-            </NativeSelectOption>
+          {fontGroups.map((group) => (
+            <NativeSelectOptGroup key={group.category} label={group.label}>
+              {FONT_OPTIONS.filter(
+                (font) => font.category === group.category,
+              ).map((font) => (
+                <NativeSelectOption key={font.id} value={font.value}>
+                  {font.label}
+                </NativeSelectOption>
+              ))}
+            </NativeSelectOptGroup>
           ))}
         </NativeSelect>
+        <span className="block text-[9px] leading-relaxed text-muted-foreground">
+          {selectedFont?.source === 'google'
+            ? !selectedFont.supportsJapanese && JAPANESE_TEXT.test(text)
+              ? '英字向けです。日本語部分は端末内フォントで補完します。'
+              : '選択時のみGoogle Fontsから必要な書体を読み込みます。'
+            : '端末内フォントを使用します。外部通信はありません。'}
+        </span>
       </label>
       <RangeControl
         label="文字サイズ"
@@ -256,7 +299,7 @@ function TextStyleControls({
             aria-label={`${title}の太さ`}
             className="w-full"
           >
-            {[300, 400, 500, 600, 700, 800, 900].map((weight) => (
+            {weights.map((weight) => (
               <NativeSelectOption key={weight} value={weight}>
                 {weight}
               </NativeSelectOption>
@@ -269,10 +312,11 @@ function TextStyleControls({
             type="button"
             variant={style.italic ? 'secondary' : 'outline'}
             aria-pressed={style.italic}
+            disabled={!italicAvailable}
             onClick={() => patch({ italic: !style.italic })}
             className="w-full italic"
           >
-            Italic
+            {italicAvailable ? 'Italic' : 'Italicなし'}
           </Button>
         </div>
       </div>
@@ -407,6 +451,7 @@ export function EditorControls({
           <AccordionContent className="space-y-3 pb-4">
             <TextStyleControls
               title="メイン"
+              text={state.mainText}
               style={state.mainTextStyle}
               onChange={(mainTextStyle) =>
                 update({ mainTextStyle, presetId: 'custom' })
@@ -414,6 +459,7 @@ export function EditorControls({
             />
             <TextStyleControls
               title="サブ"
+              text={state.subText}
               style={state.subTextStyle}
               onChange={(subTextStyle) =>
                 update({ subTextStyle, presetId: 'custom' })

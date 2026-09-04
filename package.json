@@ -16,7 +16,7 @@
     "licenses:generate": "node scripts/generate-third-party-licenses.mjs",
     "format": "oxfmt",
     "format:check": "oxfmt --check .",
-    "test": "node --test tests/image-dimensions.test.mjs",
+    "test": "node --test tests/image-dimensions.test.mjs tests/font-loader.test.mjs",
     "test:pages": "node --test tests/rendered-html.test.mjs"
   },
   "dependencies": {

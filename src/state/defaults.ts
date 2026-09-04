@@ -1,3 +1,4 @@
+import { DEFAULT_FONT_FAMILIES } from '@/src/data/fonts';
 import type { EditorState } from '@/src/types';
 
 export const SAMPLE_MAIN_TEXT = '忘れられた王都';
@@ -8,7 +9,7 @@ export const DEFAULT_STATE: EditorState = {
   subText: SAMPLE_SUB_TEXT,
   presetId: 'golden-kingdom',
   mainTextStyle: {
-    fontFamily: '"Yu Mincho", "Hiragino Mincho ProN", serif',
+    fontFamily: DEFAULT_FONT_FAMILIES.main,
     size: 94,
     color: '#e2c071',
     letterSpacing: 10,
@@ -17,7 +18,7 @@ export const DEFAULT_STATE: EditorState = {
     opacity: 1,
   },
   subTextStyle: {
-    fontFamily: 'Georgia, "Times New Roman", serif',
+    fontFamily: DEFAULT_FONT_FAMILIES.sub,
     size: 32,
     color: '#f0e1b5',
     letterSpacing: 6,

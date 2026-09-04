@@ -10,6 +10,12 @@ import {
 import { Maximize2, Move, ScanLine } from 'lucide-react';
 
 import { positionFromPointer, type DragStart } from '@/src/editor/drag';
+import {
+  areEditorFontsReady,
+  editorFontRequirementKey,
+  editorUsesGoogleFonts,
+  loadEditorFonts,
+} from '@/src/editor/font-loader';
 import { renderTitleCard } from '@/src/editor/renderer';
 import type {
   BackgroundAsset,
@@ -30,10 +36,87 @@ export function PreviewCanvas({
 }: PreviewCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragRef = useRef<DragStart | null>(null);
+  const failedFontAttemptRef = useRef<{
+    key: string;
+    message: string;
+  } | null>(null);
   const [zoom, setZoom] = useState<number | null>(null);
   const [announcedPosition, setAnnouncedPosition] = useState(state.position);
+  const fontRequirementKey = editorFontRequirementKey(state);
+  const [readyFontKey, setReadyFontKey] = useState<string | null>(() =>
+    areEditorFontsReady(state) ? fontRequirementKey : null,
+  );
+  const [fontPhase, setFontPhase] = useState<'ready' | 'loading' | 'error'>(
+    () => (areEditorFontsReady(state) ? 'ready' : 'loading'),
+  );
+  const [fontError, setFontError] = useState('');
+  const [fontRetry, setFontRetry] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
+    const attemptKey = `${fontRequirementKey}\u0000${fontRetry}`;
+    const commit = (callback: () => void) => {
+      queueMicrotask(() => {
+        if (!cancelled) callback();
+      });
+    };
+
+    if (areEditorFontsReady(state)) {
+      failedFontAttemptRef.current = null;
+      commit(() => {
+        setReadyFontKey(fontRequirementKey);
+        setFontPhase('ready');
+        setFontError('');
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (failedFontAttemptRef.current?.key === attemptKey) {
+      const failureMessage = failedFontAttemptRef.current.message;
+      commit(() => {
+        setReadyFontKey(fontRequirementKey);
+        setFontPhase('error');
+        setFontError(failureMessage);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    commit(() => {
+      setReadyFontKey(null);
+      setFontPhase('loading');
+      setFontError('');
+    });
+    void loadEditorFonts(state).then(
+      () => {
+        if (cancelled) return;
+        failedFontAttemptRef.current = null;
+        setReadyFontKey(fontRequirementKey);
+        setFontPhase('ready');
+      },
+      (error: unknown) => {
+        if (cancelled) return;
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Google Fontsを読み込めませんでした。';
+        failedFontAttemptRef.current = { key: attemptKey, message };
+        setReadyFontKey(fontRequirementKey);
+        setFontPhase('error');
+        setFontError(message);
+      },
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fontRequirementKey, fontRetry, state]);
+
+  useEffect(() => {
+    if (readyFontKey !== fontRequirementKey) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const deviceScale = Math.min(window.devicePixelRatio || 1, 2);
@@ -44,7 +127,14 @@ export function PreviewCanvas({
       drawGuide: true,
       bitmapScale: previewScale,
     });
-  }, [background, state]);
+  }, [background, fontRequirementKey, readyFontKey, state]);
+
+  useEffect(() => {
+    if (fontPhase !== 'error') return;
+    const retryWhenOnline = () => setFontRetry((current) => current + 1);
+    window.addEventListener('online', retryWhenOnline);
+    return () => window.removeEventListener('online', retryWhenOnline);
+  }, [fontPhase]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -192,11 +282,39 @@ export function PreviewCanvas({
         </div>
       </div>
 
-      <div className="flex min-h-10 items-center justify-between border-t px-4 py-2 text-[10px] text-muted-foreground">
+      <div className="flex min-h-10 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t px-4 py-2 text-[10px] text-muted-foreground">
         <span>
           位置 X {state.position.x.toFixed(1)}% · Y{' '}
           {state.position.y.toFixed(1)}%
         </span>
+        <output
+          aria-live="polite"
+          aria-atomic="true"
+          title={fontError || undefined}
+          className={fontPhase === 'error' ? 'text-amber-300' : undefined}
+        >
+          {fontPhase === 'loading' ? (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="size-1.5 animate-pulse rounded-full bg-primary" />
+              フォント読込中…
+            </span>
+          ) : fontPhase === 'error' ? (
+            <span className="inline-flex items-center gap-2">
+              代替フォントで表示中
+              <button
+                type="button"
+                className="underline underline-offset-2 hover:text-foreground"
+                onClick={() => setFontRetry((current) => current + 1)}
+              >
+                再試行
+              </button>
+            </span>
+          ) : editorUsesGoogleFonts(state) ? (
+            'Google Fonts 準備完了'
+          ) : (
+            '端末内フォント'
+          )}
+        </output>
         <span>
           {background ? `背景: ${background.name}` : '透明背景で出力'}
         </span>

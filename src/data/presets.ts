@@ -6,6 +6,7 @@ import type {
   PresetCategory,
   TextStyle,
 } from '@/src/types';
+import { SYSTEM_FONT_STACKS } from '@/src/data/fonts';
 import { SAMPLE_MAIN_TEXT, SAMPLE_SUB_TEXT } from '@/src/state/defaults';
 
 type FontProfile = {
@@ -13,11 +14,11 @@ type FontProfile = {
   sub: Pick<TextStyle, 'fontFamily' | 'weight' | 'italic'>;
 };
 
-const MINCHO = '"Yu Mincho", "Hiragino Mincho ProN", serif';
-const GOTHIC = '"Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif';
-const ROMAN = 'Georgia, "Times New Roman", serif';
-const SANS = 'Arial, Verdana, sans-serif';
-const MONO = '"Courier New", "Yu Gothic", monospace';
+const MINCHO = SYSTEM_FONT_STACKS.mincho;
+const GOTHIC = SYSTEM_FONT_STACKS.gothic;
+const ROMAN = SYSTEM_FONT_STACKS.roman;
+const SANS = SYSTEM_FONT_STACKS.arial;
+const MONO = SYSTEM_FONT_STACKS.japaneseMono;
 
 const fontProfiles: Record<string, FontProfile> = {
   M1: {
@@ -54,15 +55,23 @@ const fontProfiles: Record<string, FontProfile> = {
   },
   MO: {
     main: { fontFamily: MONO, weight: 600, italic: false },
-    sub: { fontFamily: '"Courier New", monospace', weight: 600, italic: false },
+    sub: {
+      fontFamily: SYSTEM_FONT_STACKS.courier,
+      weight: 600,
+      italic: false,
+    },
   },
   R1: {
     main: {
-      fontFamily: '"MS Gothic", "Yu Gothic", monospace',
+      fontFamily: SYSTEM_FONT_STACKS.msGothicMono,
       weight: 700,
       italic: false,
     },
-    sub: { fontFamily: '"Courier New", monospace', weight: 600, italic: false },
+    sub: {
+      fontFamily: SYSTEM_FONT_STACKS.courier,
+      weight: 600,
+      italic: false,
+    },
   },
   D1: {
     main: { fontFamily: MINCHO, weight: 500, italic: false },

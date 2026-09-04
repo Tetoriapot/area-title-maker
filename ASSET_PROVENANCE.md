@@ -3,6 +3,10 @@
 This file records the origin of the repository-owned visual assets. It does
 not grant a license to the application source or to third-party dependencies.
 
+Google Fonts are fetched at runtime and are not committed as repository-owned
+assets. Their families and third-party license notice are recorded in
+`public/FONT_NOTICES.txt`.
+
 ## `public/favicon.svg`
 
 - Created specifically for Area Title Maker on 2026-09-02.

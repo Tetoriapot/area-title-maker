@@ -1,3 +1,4 @@
+import { loadEditorFonts } from '@/src/editor/font-loader';
 import { renderTitleCard } from '@/src/editor/renderer';
 import type { EditorState } from '@/src/types';
 
@@ -49,6 +50,8 @@ export async function exportTitleCard(
   mode: ExportMode,
   backgroundImage?: CanvasImageSource | null,
 ) {
+  await loadEditorFonts(state, { forceCheck: true });
+
   const source = document.createElement('canvas');
   renderTitleCard(source, state, {
     backgroundImage,

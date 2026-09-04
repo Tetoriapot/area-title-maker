@@ -1,0 +1,38 @@
+GOOGLE FONTS NOTICE
+===================
+
+Area Title Maker does not bundle font software in this repository. When a
+Google Font is selected, the browser requests only the selected family,
+weight, and style from fonts.googleapis.com and fonts.gstatic.com. User-entered
+title text is not placed in the Google Fonts CSS request URL.
+
+Google receives network information needed to serve these files, including the
+requesting IP address. See Google's explanation:
+https://fonts.googleblog.com/2022/11/your-privacy-and-google-fonts.html
+
+The following third-party font families are offered by this application. Each
+is distributed by its authors under the SIL Open Font License 1.1 (OFL-1.1):
+
+- Noto Serif JP
+  https://fonts.google.com/specimen/Noto+Serif+JP
+- Shippori Mincho
+  https://fonts.google.com/specimen/Shippori+Mincho
+- Zen Old Mincho
+  https://fonts.google.com/specimen/Zen+Old+Mincho
+- Noto Sans JP
+  https://fonts.google.com/specimen/Noto+Sans+JP
+- Cinzel
+  https://fonts.google.com/specimen/Cinzel
+- Cormorant Garamond
+  https://fonts.google.com/specimen/Cormorant+Garamond
+- Orbitron
+  https://fonts.google.com/specimen/Orbitron
+- Rajdhani
+  https://fonts.google.com/specimen/Rajdhani
+
+SIL Open Font License 1.1:
+https://openfontlicense.org/open-font-license-official-text/
+
+This notice applies only to the third-party fonts. It does not grant a license
+to the Area Title Maker source code or repository-owned images. The repository
+continues to be published without an open-source or open-content license.
