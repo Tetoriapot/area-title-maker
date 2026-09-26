@@ -11,7 +11,7 @@
     "build": "vinext build",
     "start": "wrangler dev --config dist/server/wrangler.json",
     "typecheck": "tsc --noEmit",
-    "lint": "oxlint app components/area-title-studio.tsx components/studio components/ui/accordion.tsx components/ui/button.tsx components/ui/input.tsx components/ui/native-select.tsx components/ui/slider.tsx components/ui/switch.tsx components/ui/tabs.tsx components/ui/textarea.tsx scripts src tests next.config.ts vite.config.ts",
+    "lint": "oxlint app components/area-title-studio.tsx components/studio components/ui/accordion.tsx components/ui/button.tsx components/ui/dialog.tsx components/ui/input.tsx components/ui/native-select.tsx components/ui/slider.tsx components/ui/switch.tsx components/ui/tabs.tsx components/ui/textarea.tsx scripts src tests next.config.ts vite.config.ts",
     "audit:prod": "pnpm audit --prod --ignore GHSA-w3rx-r6r6-pgpr --ignore GHSA-5p2g-fcmc-qvqq",
     "licenses:generate": "node scripts/generate-third-party-licenses.mjs",
     "format": "oxfmt",

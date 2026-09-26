@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { THEME_BOOTSTRAP_SCRIPT } from '@/src/state/theme';
 import './globals.css';
 
 const siteOrigin = process.env.SITE_URL ?? 'http://localhost:3000';
@@ -35,7 +36,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ja" className="dark">
+    <html lang="ja" className="dark" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }} />
+      </head>
       <body>{children}</body>
     </html>
   );

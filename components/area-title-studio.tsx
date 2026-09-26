@@ -20,6 +20,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EditorControls } from '@/components/studio/editor-controls';
+import { HeaderTools } from '@/components/studio/header-tools';
 import { PresetPanel } from '@/components/studio/preset-panel';
 import { PreviewCanvas } from '@/components/studio/preview-canvas';
 import { PRESETS, applyPresetToState } from '@/src/data/presets';
@@ -310,7 +311,7 @@ export function AreaTitleStudio() {
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_72%_4%,rgba(214,181,110,.075),transparent_30%)]">
-      <header className="sticky top-0 z-40 flex min-h-16 items-center justify-between border-b bg-[#141513]/95 px-3 py-2 backdrop-blur-xl sm:px-5 lg:px-7">
+      <header className="sticky top-0 z-40 grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 border-b bg-background/95 px-3 py-2 backdrop-blur-xl sm:px-5 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:gap-x-4 lg:px-7">
         <div className="flex min-w-0 items-center gap-3">
           <span className="grid size-8 shrink-0 place-items-center rounded-md border border-primary/35 bg-primary/10 text-primary">
             <Sparkles className="size-4" />
@@ -325,7 +326,7 @@ export function AreaTitleStudio() {
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="col-span-2 row-start-2 flex items-center justify-end gap-1.5 border-t pt-2 sm:gap-2 lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:border-0 lg:pt-0">
           <span className="mr-2 hidden items-center gap-1.5 text-[9px] text-muted-foreground xl:flex">
             <LockKeyhole className="size-3 text-primary" />{' '}
             画像は外部へ送信されません
@@ -337,7 +338,7 @@ export function AreaTitleStudio() {
             aria-label="ランダムなデザインを適用"
             onClick={randomize}
           >
-            <Dices /> <span className="hidden sm:inline">ランダム</span>
+            <Dices /> <span>ランダム</span>
           </Button>
           <Button
             type="button"
@@ -354,7 +355,7 @@ export function AreaTitleStudio() {
               }
             }}
           >
-            <RotateCcw /> <span className="hidden sm:inline">リセット</span>
+            <RotateCcw /> <span>リセット</span>
           </Button>
           <Button
             type="button"
@@ -363,9 +364,11 @@ export function AreaTitleStudio() {
             disabled={exporting}
             onClick={() => exportImage('transparent')}
           >
-            <Download />{' '}
-            <span className="hidden min-[420px]:inline">PNG保存</span>
+            <Download /> <span>PNG保存</span>
           </Button>
+        </div>
+        <div className="col-start-2 row-start-1 lg:col-start-3 lg:border-l lg:pl-3">
+          <HeaderTools />
         </div>
       </header>
 

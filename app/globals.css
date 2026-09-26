@@ -32,8 +32,30 @@
   --radius-xl: 0.9rem;
 }
 
-:root,
+:root {
+  color-scheme: light;
+  --background: #f5f3ed;
+  --foreground: #292b26;
+  --card: #ffffff;
+  --card-foreground: #292b26;
+  --popover: #ffffff;
+  --popover-foreground: #292b26;
+  --primary: #80601e;
+  --primary-foreground: #ffffff;
+  --secondary: #e9e5da;
+  --secondary-foreground: #383a32;
+  --muted: #eeeae1;
+  --muted-foreground: #66675e;
+  --accent: #f2e8d0;
+  --accent-foreground: #624711;
+  --destructive: #b33636;
+  --border: #d9d6cc;
+  --input: #c8c4b8;
+  --ring: #80601e;
+}
+
 .dark {
+  color-scheme: dark;
   --background: #111211;
   --foreground: #f1eee6;
   --card: #1a1b1a;
@@ -60,7 +82,6 @@
   }
 
   html {
-    color-scheme: dark;
     background: var(--background);
   }
 

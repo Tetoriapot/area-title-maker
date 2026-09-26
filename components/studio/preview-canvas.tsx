@@ -220,7 +220,7 @@ export function PreviewCanvas({
   };
 
   return (
-    <section className="preview-panel flex min-h-[390px] flex-col overflow-hidden rounded-xl border bg-[#171816] lg:min-h-[calc(100vh-105px)]">
+    <section className="preview-panel flex min-h-[390px] flex-col overflow-hidden rounded-xl border bg-card lg:min-h-[calc(100vh-105px)]">
       <div className="flex min-h-13 items-center justify-between border-b px-4 py-2.5">
         <div>
           <div className="flex items-center gap-2">
@@ -291,7 +291,11 @@ export function PreviewCanvas({
           aria-live="polite"
           aria-atomic="true"
           title={fontError || undefined}
-          className={fontPhase === 'error' ? 'text-amber-300' : undefined}
+          className={
+            fontPhase === 'error'
+              ? 'text-amber-700 dark:text-amber-300'
+              : undefined
+          }
         >
           {fontPhase === 'loading' ? (
             <span className="inline-flex items-center gap-1.5">
